@@ -16,32 +16,36 @@ Path("validation").mkdir(exist_ok=True)
 def SignUp(model: str = "hog") -> None:
     user_name = input("Enter your name for signup: ").strip()
     user_dir = Path("training") / user_name
-    user_dir.mkdir(parents=True, exist_ok=True)
-    
+    extracted_faces_dir = user_dir / "faces"  # Folder for extracted faces
+    extracted_faces_dir.mkdir(parents=True, exist_ok=True)
+
     video_capture = cv2.VideoCapture(0)
     frame_count = 0
     encodings = []
-    names = []
 
-    print("Press 'q' to stop recording.")
+    print("Press 'q' to stop recording. Capturing up to 20 frames...")
 
     while frame_count < 20:
         ret, frame = video_capture.read()
         if not ret:
             break
-        
+
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(frame_rgb, model=model)
         face_encodings = face_recognition.face_encodings(frame_rgb, face_locations)
 
-        frame_filename = user_dir / f"frame_{frame_count}.jpg"
-        cv2.imwrite(str(frame_filename), frame)
-        
-        for encoding in face_encodings:
-            names.append(user_name)
-            encodings.append(encoding)
+        if face_encodings:  # Only save frames with detected faces
+            frame_filename = user_dir / f"frame_{frame_count}.jpg"
+            cv2.imwrite(str(frame_filename), frame)
 
-        frame_count += 1
+            for i, (top, right, bottom, left) in enumerate(face_locations):
+                face_image = frame[top:bottom, left:right]  # Crop the face
+                face_filename = extracted_faces_dir / f"face_{frame_count}_{i}.jpg"
+                cv2.imwrite(str(face_filename), face_image)
+
+            encodings.extend(face_encodings)
+            frame_count += 1
+
         cv2.imshow('Webcam', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -49,11 +53,27 @@ def SignUp(model: str = "hog") -> None:
     video_capture.release()
     cv2.destroyAllWindows()
 
-    name_encodings = {"names": names, "encodings": encodings}
+    if not encodings:
+        print("No faces were captured. Please try again.")
+        return
+
+    # Load existing encodings if available
+    if DEFAULT_ENCODINGS_PATH.exists():
+        with DEFAULT_ENCODINGS_PATH.open(mode="rb") as f:
+            existing_data = pickle.load(f)
+    else:
+        existing_data = {"names": [], "encodings": []}
+
+    # Append new encodings
+    existing_data["names"].extend([user_name] * len(encodings))
+    existing_data["encodings"].extend(encodings)
+
+    # Save updated encodings
     with DEFAULT_ENCODINGS_PATH.open(mode="wb") as f:
-        pickle.dump(name_encodings, f)
-    
-    print(f"Processed {frame_count} frames for {user_name} and stored encodings.")
+        pickle.dump(existing_data, f)
+
+    print(f"Signup completed. {frame_count} frames processed for {user_name}. Faces saved in {extracted_faces_dir}.")
+
 
 def Login(model: str = "hog") -> None:
     video_capture = cv2.VideoCapture(0)
