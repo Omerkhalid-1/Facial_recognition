@@ -37,3 +37,16 @@ python detector.py --test -f path/to/image.jpg
 ```
 - Replace `path/to/image.jpg` with the actual path of the image.
 - The system will attempt to recognize the face in the image.
+
+
+
+# For detector.py
+It will provide with the SignUp option, Login option and to exit the menu. 
+
+By pressing Signup 
+- It will extract the face and then save the encodings in training folder.
+- It will extract the total of 20 frames in total.
+- Then save them in the folder training.
+
+By pressing Login 
+- It will compare the faces and then grant access to the user with the most matched frames. 
